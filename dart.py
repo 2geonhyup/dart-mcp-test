@@ -138,7 +138,7 @@ async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str]:
     url = f"{BASE_URL}/corpCode.xml?crtfc_key={API_KEY}"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
             try:
                 response = await client.get(url)
                 
@@ -215,7 +215,7 @@ async def get_disclosure_list(corp_code: str, start_date: str, end_date: str) ->
     url = f"{BASE_URL}/list.json?crtfc_key={API_KEY}&corp_code={corp_code}&bgn_de={start_date}&end_de={end_date}&pblntf_ty=A&page_count=100"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
             try:
                 response = await client.get(url)
                 
@@ -255,7 +255,7 @@ async def get_financial_statement_xbrl(rcept_no: str, reprt_code: str) -> str:
     url = f"{BASE_URL}/fnlttXbrl.xml?crtfc_key={API_KEY}&rcept_no={rcept_no}&reprt_code={reprt_code}"
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
             response = await client.get(url)
 
             if response.status_code != 200:
@@ -675,7 +675,7 @@ async def get_original_document(rcept_no: str) -> Tuple[str, Optional[bytes]]:
     url = f"{BASE_URL}/document.xml?crtfc_key={API_KEY}&rcept_no={rcept_no}"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
             response = await client.get(url)
             
             if response.status_code != 200:
@@ -1302,7 +1302,7 @@ async def get_financial_json(corp_code: str, bsns_year: str, reprt_code: str, fs
     url = f"{BASE_URL}/fnlttSinglAcntAll.json?crtfc_key={API_KEY}&corp_code={corp_code}&bsns_year={bsns_year}&reprt_code={reprt_code}&fs_div={fs_div}"
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
             try:
                 response = await client.get(url)
                 
