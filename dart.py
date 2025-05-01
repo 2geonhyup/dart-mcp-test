@@ -11,6 +11,16 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import socket
 
+# 브라우저와 유사한 헤더 추가
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1"
+}
+        
+
 
 load_dotenv()
 # 상수 정의
@@ -140,7 +150,7 @@ async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str]:
     try:
         async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
             try:
-                response = await client.get(url)
+                response = await client.get(url, headers=HEADERS)
                 
                 if response.status_code != 200:
                     return ("", f"API 요청 실패: HTTP 상태 코드 {response.status_code}")
@@ -217,7 +227,7 @@ async def get_disclosure_list(corp_code: str, start_date: str, end_date: str) ->
     try:
         async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
             try:
-                response = await client.get(url)
+                response = await client.get(url, headers=HEADERS)
                 
                 if response.status_code != 200:
                     return [], f"API 요청 실패: HTTP 상태 코드 {response.status_code}"
@@ -256,7 +266,7 @@ async def get_financial_statement_xbrl(rcept_no: str, reprt_code: str) -> str:
 
     try:
         async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
-            response = await client.get(url)
+            response = await client.get(url, headers=HEADERS)
 
             if response.status_code != 200:
                 return f"API 요청 실패: HTTP 상태 코드 {response.status_code}"
@@ -676,7 +686,7 @@ async def get_original_document(rcept_no: str) -> Tuple[str, Optional[bytes]]:
     
     try:
         async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
-            response = await client.get(url)
+            response = await client.get(url, headers=HEADERS)
             
             if response.status_code != 200:
                 return f"API 요청 실패: HTTP 상태 코드 {response.status_code}", None
@@ -1304,7 +1314,7 @@ async def get_financial_json(corp_code: str, bsns_year: str, reprt_code: str, fs
     try:
         async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
             try:
-                response = await client.get(url)
+                response = await client.get(url, headers=HEADERS)
                 
                 if response.status_code != 200:
                     return [], f"API 요청 실패: HTTP 상태 코드 {response.status_code}"
