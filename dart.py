@@ -9,6 +9,7 @@ import re
 import traceback
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import socket
 
 
 load_dotenv()
@@ -1515,6 +1516,53 @@ async def search_json_financial_data(
     
     result += chat_guideline
     return result.strip()
+
+
+@mcp.tool()
+async def test_connection_to_dart(
+    ctx: Context,
+) -> str:
+    """
+    DART 서버와의 연결 상태를 테스트하는 도구
+    
+    Args:
+        ctx: MCP Context 객체
+        
+    Returns:
+        연결 테스트 과정 및 결과에 대한 상세 메시지
+    """
+    import socket
+    
+    host = "opendart.fss.or.kr"
+    port = 443
+    
+    result_msgs = []
+    result_msgs.append(f"{host}:{port}에 연결 시도...")
+    
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(5)
+        
+        # DNS 해결 과정 테스트
+        result_msgs.append(f"DNS 조회 중: {host}")
+        ip_address = socket.gethostbyname(host)
+        result_msgs.append(f"DNS 해결됨: {host} -> {ip_address}")
+        
+        # 소켓 연결 시도
+        result_msgs.append(f"소켓 연결 시도: {ip_address}:{port}")
+        s.connect((host, port))
+        s.close()
+        result_msgs.append(f"{host}:{port}에 연결 성공")
+        return "\n".join(result_msgs)
+    except socket.gaierror as e:
+        result_msgs.append(f"DNS 해결 실패: {e}")
+        return "\n".join(result_msgs)
+    except socket.timeout as e:
+        result_msgs.append(f"연결 타임아웃: {e}")
+        return "\n".join(result_msgs)
+    except Exception as e:
+        result_msgs.append(f"연결 실패: {e}")
+        return "\n".join(result_msgs)
 
 
 # 서버 실행 코드
