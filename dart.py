@@ -15,11 +15,14 @@ import asyncio
 
 # 브라우저와 유사한 헤더 추가
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
     "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1"
+    "Referer": "https://opendart.fss.or.kr/",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "same-origin"
 }
         
 
@@ -140,18 +143,6 @@ chat_guideline = "\n* 제공된 공시정보들은 분기, 반기, 연간이 섞
 # 로그를 저장할 전역 변수 추가
 corp_code_search_logs = []
 
-# 회사 코드 캐시 (메모리 내 캐싱)
-corp_code_cache = {}
-
-# API 키 마스킹 함수
-def mask_api_key(url: str) -> str:
-    """API 키를 마스킹하는 함수"""
-    if 'crtfc_key=' in url:
-        import re
-        # API 키의 처음 4자와 마지막 4자만 표시하고 나머지는 * 처리
-        return re.sub(r'crtfc_key=([a-zA-Z0-9]{4})([a-zA-Z0-9]+)([a-zA-Z0-9]{4})', r'crtfc_key=\1****\3', url)
-    return url
-
 async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str, List[str]]:
     """
     회사명으로 회사의 고유번호를 검색하는 함수
@@ -162,14 +153,6 @@ async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str, List[str]]:
     Returns:
         (고유번호, 기업이름, 로그리스트) 튜플, 찾지 못한 경우 ("", "", 로그리스트)
     """
-    # 캐시 확인
-    global corp_code_cache
-    if corp_name in corp_code_cache:
-        code, name = corp_code_cache[corp_name]
-        logs = [f"캐시에서 회사 코드 검색: {corp_name} -> {name} (코드: {code})"]
-        corp_code_search_logs.extend(logs)
-        return (code, name, logs)
-    
     # 로그 초기화
     global corp_code_search_logs
     corp_code_search_logs = []
@@ -178,100 +161,78 @@ async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str, List[str]]:
     corp_code_search_logs.append(f"회사명 '{corp_name}' 검색 시작")
     
     url = f"{BASE_URL}/corpCode.xml?crtfc_key={API_KEY}"
-    logs.append(f"API URL 생성: {mask_api_key(url)}")
-    corp_code_search_logs.append(f"API URL 생성: {mask_api_key(url)}")
+    logs.append(f"API URL 생성: {url}")
+    corp_code_search_logs.append(f"API URL 생성: {url}")
     
     try:
-        # 클라이언트 소켓 정보 로깅
-        import socket
-        try:
-            hostname = socket.gethostname()
-            local_ip = socket.gethostbyname(hostname)
-            log_msg = f"클라이언트 정보 - 호스트명: {hostname}, IP: {local_ip}"
-            logs.append(log_msg)
-            corp_code_search_logs.append(log_msg)
-        except Exception as e:
-            log_msg = f"클라이언트 정보 조회 실패: {str(e)}"
-            logs.append(log_msg)
-            corp_code_search_logs.append(log_msg)
+        # 프록시가 없으면 None을 전달
+        proxies = None
         
-        # DART 서버 연결 테스트
-        try:
-            dart_host = "opendart.fss.or.kr"
-            log_msg = f"DART 서버({dart_host}) 연결 테스트 시작"
-            logs.append(log_msg)
-            corp_code_search_logs.append(log_msg)
-            
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(3)
-            
-            # DNS 해결 과정 테스트
-            log_msg = f"DNS 조회 중: {dart_host}"
-            logs.append(log_msg)
-            corp_code_search_logs.append(log_msg)
-            
-            dart_ip = socket.gethostbyname(dart_host)
-            log_msg = f"DNS 해결됨: {dart_host} -> {dart_ip}"
-            logs.append(log_msg)
-            corp_code_search_logs.append(log_msg)
-            
-            # 소켓 연결 시도
-            log_msg = f"소켓 연결 시도: {dart_ip}:443"
-            logs.append(log_msg)
-            corp_code_search_logs.append(log_msg)
-            
-            s.connect((dart_host, 443))
-            s.close()
-            log_msg = f"{dart_host}:443에 연결 성공"
-            logs.append(log_msg)
-            corp_code_search_logs.append(log_msg)
-        except socket.gaierror as e:
-            log_msg = f"DNS 해결 실패: {e}"
-            logs.append(log_msg)
-            corp_code_search_logs.append(log_msg)
-        except socket.timeout as e:
-            log_msg = f"연결 타임아웃: {e}"
-            logs.append(log_msg)
-            corp_code_search_logs.append(log_msg)
-        except Exception as e:
-            log_msg = f"연결 테스트 실패: {e}"
-            logs.append(log_msg)
-            corp_code_search_logs.append(log_msg)
-            
-        # API 요청 시도
-        log_msg = "httpx 클라이언트 생성 중"
-        logs.append(log_msg)
-        corp_code_search_logs.append(log_msg)
-        
-        # 타임아웃을 늘리고(15초), 연결 옵션 상세화
-        client_options = {
-            "verify": False,           # SSL 인증서 검증 비활성화
-            "timeout": 15.0,           # 타임아웃 증가 (15초)
-            "follow_redirects": True,  # 리다이렉트 자동 처리
-            "http1": True,             # HTTP/1.1 강제 사용 (호환성)
-            "http2": False             # HTTP/2 비활성화 (호환성)
-        }
-        
-        log_msg = f"클라이언트 옵션: {client_options}"
-        logs.append(log_msg)
-        corp_code_search_logs.append(log_msg)
-        
-        async with httpx.AsyncClient(**client_options) as client:
+        async with httpx.AsyncClient(verify=False, timeout=10.0, proxies=proxies) as client:
             try:
-                log_msg = f"GET 요청 시작: {mask_api_key(url)}"
+                # 클라이언트 소켓 정보 로깅
+                import socket
+                try:
+                    hostname = socket.gethostname()
+                    local_ip = socket.gethostbyname(hostname)
+                    log_msg = f"클라이언트 정보 - 호스트명: {hostname}, IP: {local_ip}"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                except Exception as e:
+                    log_msg = f"클라이언트 정보 조회 실패: {str(e)}"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                
+                # DART 서버 연결 테스트
+                try:
+                    dart_host = "opendart.fss.or.kr"
+                    log_msg = f"DART 서버({dart_host}) 연결 테스트 시작"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                    
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(3)
+                    
+                    # DNS 해결 과정 테스트
+                    log_msg = f"DNS 조회 중: {dart_host}"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                    
+                    dart_ip = socket.gethostbyname(dart_host)
+                    log_msg = f"DNS 해결됨: {dart_host} -> {dart_ip}"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                    
+                    # 소켓 연결 시도
+                    log_msg = f"소켓 연결 시도: {dart_ip}:443"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                    
+                    s.connect((dart_host, 443))
+                    s.close()
+                    log_msg = f"{dart_host}:443에 연결 성공"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                except socket.gaierror as e:
+                    log_msg = f"DNS 해결 실패: {e}"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                except socket.timeout as e:
+                    log_msg = f"연결 타임아웃: {e}"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                except Exception as e:
+                    log_msg = f"연결 테스트 실패: {e}"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                    
+                # API 요청 시도
+                log_msg = "httpx 클라이언트 생성 중"
                 logs.append(log_msg)
                 corp_code_search_logs.append(log_msg)
                 
-                # HTTP 요청 시작 시간 기록
-                import time
-                start_time = time.time()
-                
-                # 요청 보내기 (주의: 이 부분은 시간이 많이 걸릴 수 있음)
                 response = await client.get(url, headers=HEADERS)
-                
-                # 요청 완료 시간 계산
-                elapsed = time.time() - start_time
-                log_msg = f"응답 수신: 상태 코드 {response.status_code}, 소요 시간: {elapsed:.2f}초"
+                log_msg = f"응답 수신: 상태 코드 {response.status_code}"
                 logs.append(log_msg)
                 corp_code_search_logs.append(log_msg)
                 
@@ -352,10 +313,6 @@ async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str, List[str]]:
                                     matches.sort(key=lambda x: x[2])
                                     matched_name = matches[0][0]
                                     matched_code = matches[0][1]
-                                    
-                                    # 캐시에 저장
-                                    corp_code_cache[corp_name] = (matched_code, matched_name)
-                                    
                                     log_msg = f"가장 일치하는 회사: {matched_name} (코드: {matched_code})"
                                     logs.append(log_msg)
                                     corp_code_search_logs.append(log_msg)
@@ -375,17 +332,9 @@ async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str, List[str]]:
                     logs.append(log_msg)
                     corp_code_search_logs.append(log_msg)
                     
-                    # 응답 내용 미리보기 (보안을 위해 제한적으로 표시)
-                    preview = str(response.content[:100]).replace('\\n', ' ').replace('\\r', ' ')
-                    log_msg = f"응답 내용 미리보기: {preview}..."
+                    log_msg = f"응답 내용 미리보기: {response.content[:100]}"
                     logs.append(log_msg)
                     corp_code_search_logs.append(log_msg)
-                    
-                    # 응답 헤더 로깅
-                    log_msg = f"응답 헤더: {dict(response.headers)}"
-                    logs.append(log_msg)
-                    corp_code_search_logs.append(log_msg)
-                    
                     return ("", "다운로드한 파일이 유효한 ZIP 파일이 아닙니다.", logs)
                 except Exception as e:
                     log_msg = f"ZIP 파일 처리 중 오류 발생: {str(e)}"
@@ -1002,16 +951,15 @@ async def search_disclosure(
         try:
             result_log.append(f"INFO: 회사 코드 조회 시작: {company_name}")
             corp_code_task = asyncio.create_task(get_corp_code_by_name(company_name))
-            done, pending = await asyncio.wait([corp_code_task], timeout=20.0)  # 타임아웃 20초로 증가
+            done, pending = await asyncio.wait([corp_code_task], timeout=10.0)
             
             if corp_code_task in pending:
                 # 시간 초과 시 현재까지의 로그 반환
                 pending.pop().cancel()
-                timeout_msg = f"회사 코드 조회 시간 초과 (20초 이상 소요)"
+                timeout_msg = f"회사 코드 조회 시간 초과 (10초 이상 소요)"
                 ctx.error(timeout_msg)
                 result_log.append(f"ERROR: {timeout_msg}")
                 result_log.append("INFO: DART 서버 연결 상태를 확인해주세요.")
-                result_log.append("INFO: API 키가 배포 환경 IP에 등록되어 있는지 확인해주세요.")
                 
                 # 전역 변수에서 로그 가져오기
                 result_log.append("--- get_corp_code_by_name 함수 로그 ---")
