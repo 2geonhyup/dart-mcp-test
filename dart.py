@@ -137,6 +137,9 @@ chat_guideline = "\n* 제공된 공시정보들은 분기, 반기, 연간이 섞
 
 # Helper 함수
 
+# 로그를 저장할 전역 변수 추가
+corp_code_search_logs = []
+
 async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str, List[str]]:
     """
     회사명으로 회사의 고유번호를 검색하는 함수
@@ -148,11 +151,15 @@ async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str, List[str]]:
         (고유번호, 기업이름, 로그리스트) 튜플, 찾지 못한 경우 ("", "", 로그리스트)
     """
     # 로그 초기화
+    global corp_code_search_logs
+    corp_code_search_logs = []
     logs = []
     logs.append(f"회사명 '{corp_name}' 검색 시작")
+    corp_code_search_logs.append(f"회사명 '{corp_name}' 검색 시작")
     
     url = f"{BASE_URL}/corpCode.xml?crtfc_key={API_KEY}"
     logs.append(f"API URL 생성: {url}")
+    corp_code_search_logs.append(f"API URL 생성: {url}")
     
     try:
         # 클라이언트 소켓 정보 로깅
@@ -160,63 +167,115 @@ async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str, List[str]]:
         try:
             hostname = socket.gethostname()
             local_ip = socket.gethostbyname(hostname)
-            logs.append(f"클라이언트 정보 - 호스트명: {hostname}, IP: {local_ip}")
+            log_msg = f"클라이언트 정보 - 호스트명: {hostname}, IP: {local_ip}"
+            logs.append(log_msg)
+            corp_code_search_logs.append(log_msg)
         except Exception as e:
-            logs.append(f"클라이언트 정보 조회 실패: {str(e)}")
+            log_msg = f"클라이언트 정보 조회 실패: {str(e)}"
+            logs.append(log_msg)
+            corp_code_search_logs.append(log_msg)
         
         # DART 서버 연결 테스트
         try:
             dart_host = "opendart.fss.or.kr"
-            logs.append(f"DART 서버({dart_host}) 연결 테스트 시작")
+            log_msg = f"DART 서버({dart_host}) 연결 테스트 시작"
+            logs.append(log_msg)
+            corp_code_search_logs.append(log_msg)
+            
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(3)
             
             # DNS 해결 과정 테스트
-            logs.append(f"DNS 조회 중: {dart_host}")
+            log_msg = f"DNS 조회 중: {dart_host}"
+            logs.append(log_msg)
+            corp_code_search_logs.append(log_msg)
+            
             dart_ip = socket.gethostbyname(dart_host)
-            logs.append(f"DNS 해결됨: {dart_host} -> {dart_ip}")
+            log_msg = f"DNS 해결됨: {dart_host} -> {dart_ip}"
+            logs.append(log_msg)
+            corp_code_search_logs.append(log_msg)
             
             # 소켓 연결 시도
-            logs.append(f"소켓 연결 시도: {dart_ip}:443")
+            log_msg = f"소켓 연결 시도: {dart_ip}:443"
+            logs.append(log_msg)
+            corp_code_search_logs.append(log_msg)
+            
             s.connect((dart_host, 443))
             s.close()
-            logs.append(f"{dart_host}:443에 연결 성공")
+            log_msg = f"{dart_host}:443에 연결 성공"
+            logs.append(log_msg)
+            corp_code_search_logs.append(log_msg)
         except socket.gaierror as e:
-            logs.append(f"DNS 해결 실패: {e}")
+            log_msg = f"DNS 해결 실패: {e}"
+            logs.append(log_msg)
+            corp_code_search_logs.append(log_msg)
         except socket.timeout as e:
-            logs.append(f"연결 타임아웃: {e}")
+            log_msg = f"연결 타임아웃: {e}"
+            logs.append(log_msg)
+            corp_code_search_logs.append(log_msg)
         except Exception as e:
-            logs.append(f"연결 테스트 실패: {e}")
+            log_msg = f"연결 테스트 실패: {e}"
+            logs.append(log_msg)
+            corp_code_search_logs.append(log_msg)
             
         # API 요청 시도
-        logs.append("httpx 클라이언트 생성 중")
+        log_msg = "httpx 클라이언트 생성 중"
+        logs.append(log_msg)
+        corp_code_search_logs.append(log_msg)
+        
         async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
             try:
-                logs.append(f"GET 요청 시작: {url}")
+                log_msg = f"GET 요청 시작: {url}"
+                logs.append(log_msg)
+                corp_code_search_logs.append(log_msg)
+                
                 response = await client.get(url, headers=HEADERS)
-                logs.append(f"응답 수신: 상태 코드 {response.status_code}")
+                log_msg = f"응답 수신: 상태 코드 {response.status_code}"
+                logs.append(log_msg)
+                corp_code_search_logs.append(log_msg)
                 
                 if response.status_code != 200:
-                    logs.append(f"API 요청 실패: HTTP 상태 코드 {response.status_code}")
+                    log_msg = f"API 요청 실패: HTTP 상태 코드 {response.status_code}"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
                     return ("", f"API 요청 실패: HTTP 상태 코드 {response.status_code}", logs)
                 
-                logs.append(f"응답 크기: {len(response.content)} 바이트")
+                log_msg = f"응답 크기: {len(response.content)} 바이트"
+                logs.append(log_msg)
+                corp_code_search_logs.append(log_msg)
                 
                 try:
-                    logs.append("ZIP 파일 파싱 시작")
+                    log_msg = "ZIP 파일 파싱 시작"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                    
                     with zipfile.ZipFile(BytesIO(response.content)) as zip_file:
-                        logs.append(f"ZIP 파일 내 항목: {zip_file.namelist()}")
+                        log_msg = f"ZIP 파일 내 항목: {zip_file.namelist()}"
+                        logs.append(log_msg)
+                        corp_code_search_logs.append(log_msg)
+                        
                         try:
-                            logs.append("CORPCODE.xml 파일 열기 시도")
+                            log_msg = "CORPCODE.xml 파일 열기 시도"
+                            logs.append(log_msg)
+                            corp_code_search_logs.append(log_msg)
+                            
                             with zip_file.open('CORPCODE.xml') as xml_file:
                                 try:
-                                    logs.append("XML 파싱 시작")
+                                    log_msg = "XML 파싱 시작"
+                                    logs.append(log_msg)
+                                    corp_code_search_logs.append(log_msg)
+                                    
                                     tree = ET.parse(xml_file)
                                     root = tree.getroot()
-                                    logs.append("XML 파싱 성공")
+                                    log_msg = "XML 파싱 성공"
+                                    logs.append(log_msg)
+                                    corp_code_search_logs.append(log_msg)
                                     
                                     # 검색어를 포함하는 모든 회사 찾기
-                                    logs.append(f"'{corp_name}' 검색 시작")
+                                    log_msg = f"'{corp_name}' 검색 시작"
+                                    logs.append(log_msg)
+                                    corp_code_search_logs.append(log_msg)
+                                    
                                     matches = []
                                     for company in root.findall('.//list'):
                                         name = company.find('corp_name').text
@@ -237,40 +296,63 @@ async def get_corp_code_by_name(corp_name: str) -> Tuple[str, str, List[str]]:
                                             code = company.find('corp_code').text
                                             matches.append((name, code, score))
                                     
-                                    logs.append(f"검색 결과: {len(matches)}개 회사 찾음")
+                                    log_msg = f"검색 결과: {len(matches)}개 회사 찾음"
+                                    logs.append(log_msg)
+                                    corp_code_search_logs.append(log_msg)
                                     
                                     # 일치하는 회사가 없는 경우
                                     if not matches:
-                                        logs.append(f"'{corp_name}' 회사를 찾을 수 없음")
+                                        log_msg = f"'{corp_name}' 회사를 찾을 수 없음"
+                                        logs.append(log_msg)
+                                        corp_code_search_logs.append(log_msg)
                                         return ("", f"'{corp_name}' 회사를 찾을 수 없습니다.", logs)
                                     
                                     # 일치도 점수가 가장 낮은 (가장 일치하는) 회사 반환
                                     matches.sort(key=lambda x: x[2])
                                     matched_name = matches[0][0]
                                     matched_code = matches[0][1]
-                                    logs.append(f"가장 일치하는 회사: {matched_name} (코드: {matched_code})")
+                                    log_msg = f"가장 일치하는 회사: {matched_name} (코드: {matched_code})"
+                                    logs.append(log_msg)
+                                    corp_code_search_logs.append(log_msg)
                                     return (matched_code, matched_name, logs)
                                 except ET.ParseError as e:
-                                    logs.append(f"XML 파싱 오류: {str(e)}")
+                                    log_msg = f"XML 파싱 오류: {str(e)}"
+                                    logs.append(log_msg)
+                                    corp_code_search_logs.append(log_msg)
                                     return ("", f"XML 파싱 오류: {str(e)}", logs)
                         except Exception as e:
-                            logs.append(f"ZIP 파일 내부 파일 접근 오류: {str(e)}")
+                            log_msg = f"ZIP 파일 내부 파일 접근 오류: {str(e)}"
+                            logs.append(log_msg)
+                            corp_code_search_logs.append(log_msg)
                             return ("", f"ZIP 파일 내부 파일 접근 오류: {str(e)}", logs)
                 except zipfile.BadZipFile:
-                    logs.append("다운로드한 파일이 유효한 ZIP 파일이 아님")
-                    logs.append(f"응답 내용 미리보기: {response.content[:100]}")
+                    log_msg = "다운로드한 파일이 유효한 ZIP 파일이 아님"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
+                    
+                    log_msg = f"응답 내용 미리보기: {response.content[:100]}"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
                     return ("", "다운로드한 파일이 유효한 ZIP 파일이 아닙니다.", logs)
                 except Exception as e:
-                    logs.append(f"ZIP 파일 처리 중 오류 발생: {str(e)}")
+                    log_msg = f"ZIP 파일 처리 중 오류 발생: {str(e)}"
+                    logs.append(log_msg)
+                    corp_code_search_logs.append(log_msg)
                     return ("", f"ZIP 파일 처리 중 오류 발생: {str(e)}", logs)
             except httpx.RequestError as e:
-                logs.append(f"API 요청 중 네트워크 오류 발생: {str(e)}")
+                log_msg = f"API 요청 중 네트워크 오류 발생: {str(e)}"
+                logs.append(log_msg)
+                corp_code_search_logs.append(log_msg)
                 return ("", f"API 요청 중 네트워크 오류 발생: {str(e)}", logs)
     except Exception as e:
-        logs.append(f"회사 코드 조회 중 예상치 못한 오류 발생: {str(e)}")
+        log_msg = f"회사 코드 조회 중 예상치 못한 오류 발생: {str(e)}"
+        logs.append(log_msg)
+        corp_code_search_logs.append(log_msg)
         return ("", f"회사 코드 조회 중 예상치 못한 오류 발생: {str(e)}", logs)
     
-    logs.append("알 수 없는 오류로 회사 정보를 찾을 수 없음")
+    log_msg = "알 수 없는 오류로 회사 정보를 찾을 수 없음"
+    logs.append(log_msg)
+    corp_code_search_logs.append(log_msg)
     return ("", "알 수 없는 오류로 회사 정보를 찾을 수 없습니다.", logs)
 
 
@@ -876,6 +958,12 @@ async def search_disclosure(
                 ctx.error(timeout_msg)
                 result_log.append(f"ERROR: {timeout_msg}")
                 result_log.append("INFO: DART 서버 연결 상태를 확인해주세요.")
+                
+                # 전역 변수에서 로그 가져오기
+                result_log.append("--- get_corp_code_by_name 함수 로그 ---")
+                result_log.extend([f"DETAIL: {log}" for log in corp_code_search_logs])
+                result_log.append("--- get_corp_code_by_name 함수 로그 끝 ---")
+                
                 return "\n".join(result_log)
             
             corp_code, matched_name, corp_code_logs = corp_code_task.result()
@@ -889,6 +977,12 @@ async def search_disclosure(
             error_msg = f"회사 코드 조회 중 오류 발생: {str(e)}"
             ctx.error(error_msg)
             result_log.append(f"ERROR: {error_msg}")
+            
+            # 전역 변수에서 로그 가져오기
+            result_log.append("--- get_corp_code_by_name 함수 로그 ---")
+            result_log.extend([f"DETAIL: {log}" for log in corp_code_search_logs])
+            result_log.append("--- get_corp_code_by_name 함수 로그 끝 ---")
+            
             return "\n".join(result_log)
         
         if not corp_code:
