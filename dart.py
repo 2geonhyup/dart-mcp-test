@@ -10,6 +10,8 @@ import traceback
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import socket
+import time
+import asyncio
 
 # 브라우저와 유사한 헤더 추가
 HEADERS = {
@@ -774,6 +776,8 @@ async def search_disclosure(
     """
     # 결과 문자열 초기화
     result = ""
+    # 로그 문자열 초기화
+    result_log = []
     
     try:
         # 진행 상황 알림
@@ -782,34 +786,94 @@ async def search_disclosure(
             info_msg += f" {', '.join(requested_items)} 관련"
         info_msg += " 재무 정보를 검색합니다."
         ctx.info(info_msg)
+        result_log.append(f"INFO: {info_msg}")
         
         # end_date 조정
         original_end_date = end_date
         adjusted_end_date, was_adjusted = adjust_end_date(end_date)
         
         if was_adjusted:
-            ctx.info(f"공시 제출 기간을 고려하여 검색 종료일을 {original_end_date}에서 {adjusted_end_date}로 자동 조정했습니다.")
+            adjust_msg = f"공시 제출 기간을 고려하여 검색 종료일을 {original_end_date}에서 {adjusted_end_date}로 자동 조정했습니다."
+            ctx.info(adjust_msg)
+            result_log.append(f"INFO: {adjust_msg}")
             end_date = adjusted_end_date
         
         # 회사 코드 조회
-        corp_code, matched_name = await get_corp_code_by_name(company_name)
-        if not corp_code:
-            return f"회사 검색 오류: {matched_name}"
+        import time
+        import asyncio
         
-        ctx.info(f"{matched_name}(고유번호: {corp_code})의 공시를 검색합니다.")
+        start_time = time.time()
+        try:
+            corp_code_task = asyncio.create_task(get_corp_code_by_name(company_name))
+            done, pending = await asyncio.wait([corp_code_task], timeout=5.0)
+            
+            if corp_code_task in pending:
+                # 5초 초과 시 현재까지의 로그 반환
+                pending.pop().cancel()
+                timeout_msg = f"회사 코드 조회 시간 초과 (5초 이상 소요)"
+                ctx.error(timeout_msg)
+                result_log.append(f"ERROR: {timeout_msg}")
+                return "\n".join(result_log)
+            
+            corp_code, matched_name = corp_code_task.result()
+        except Exception as e:
+            error_msg = f"회사 코드 조회 중 오류 발생: {str(e)}"
+            ctx.error(error_msg)
+            result_log.append(f"ERROR: {error_msg}")
+            return "\n".join(result_log)
+        
+        elapsed_time = time.time() - start_time
+        result_log.append(f"INFO: 회사 코드 조회 완료 ({elapsed_time:.2f}초 소요)")
+        
+        if not corp_code:
+            error_msg = f"회사 검색 오류: {matched_name}"
+            result_log.append(f"ERROR: {error_msg}")
+            return "\n".join(result_log)
+        
+        corp_info_msg = f"{matched_name}(고유번호: {corp_code})의 공시를 검색합니다."
+        ctx.info(corp_info_msg)
+        result_log.append(f"INFO: {corp_info_msg}")
         
         # 공시 목록 조회
-        disclosures, error_msg = await get_disclosure_list(corp_code, start_date, end_date)
+        start_time = time.time()
+        try:
+            disclosure_task = asyncio.create_task(get_disclosure_list(corp_code, start_date, end_date))
+            done, pending = await asyncio.wait([disclosure_task], timeout=5.0)
+            
+            if disclosure_task in pending:
+                # 5초 초과 시 현재까지의 로그 반환
+                pending.pop().cancel()
+                timeout_msg = f"공시 목록 조회 시간 초과 (5초 이상 소요)"
+                ctx.error(timeout_msg)
+                result_log.append(f"ERROR: {timeout_msg}")
+                return "\n".join(result_log)
+            
+            disclosures, error_msg = disclosure_task.result()
+        except Exception as e:
+            error_msg = f"공시 목록 조회 중 오류 발생: {str(e)}"
+            ctx.error(error_msg)
+            result_log.append(f"ERROR: {error_msg}")
+            return "\n".join(result_log)
+            
+        elapsed_time = time.time() - start_time
+        result_log.append(f"INFO: 공시 목록 조회 완료 ({elapsed_time:.2f}초 소요)")
+        
         if error_msg:
-            return f"공시 목록 조회 오류: {error_msg}"
+            error_msg = f"공시 목록 조회 오류: {error_msg}"
+            result_log.append(f"ERROR: {error_msg}")
+            return "\n".join(result_log)
             
         if not disclosures:
             date_range_msg = f"{start_date}부터 {end_date}까지"
             if was_adjusted:
                 date_range_msg += f" (원래 요청: {start_date}~{original_end_date}, 공시 제출 기간 고려하여 확장)"
-            return f"{date_range_msg} '{matched_name}'(고유번호: {corp_code})의 정기공시가 없습니다."
+            no_disclosure_msg = f"{date_range_msg} '{matched_name}'(고유번호: {corp_code})의 정기공시가 없습니다."
+            result_log.append(f"INFO: {no_disclosure_msg}")
+            return "\n".join(result_log)
         
-        ctx.info(f"{len(disclosures)}개의 정기공시를 찾았습니다. XBRL 데이터 조회 및 분석을 시도합니다.")
+        disclosure_count_msg = f"{len(disclosures)}개의 정기공시를 찾았습니다. XBRL 데이터 조회 및 분석을 시도합니다."
+        ctx.info(disclosure_count_msg)
+        result_log.append(f"INFO: {disclosure_count_msg}")
 
         # 추출할 재무 항목 및 가능한 태그 리스트 정의
         all_items_and_tags = {
@@ -829,7 +893,9 @@ async def search_disclosure(
             items_to_extract = {item: tags for item, tags in all_items_and_tags.items() if item in requested_items}
             if not items_to_extract:
                  unsupported_items = [item for item in requested_items if item not in all_items_and_tags]
-                 return f"요청하신 항목 중 지원되지 않는 항목이 있습니다: {', '.join(unsupported_items)}. 지원 항목: {', '.join(all_items_and_tags.keys())}"
+                 unsupported_msg = f"요청하신 항목 중 지원되지 않는 항목이 있습니다: {', '.join(unsupported_items)}. 지원 항목: {', '.join(all_items_and_tags.keys())}"
+                 result_log.append(f"ERROR: {unsupported_msg}")
+                 return "\n".join(result_log)
         else:
             items_to_extract = all_items_and_tags
         
@@ -854,17 +920,49 @@ async def search_disclosure(
             # 보고서 코드 결정
             reprt_code = determine_report_code(report_name)
             if not rcept_no or not reprt_code:
+                report_skip_msg = f"보고서 코드를 찾을 수 없어 건너뜀: {report_name}"
+                result_log.append(f"INFO: {report_skip_msg}")
                 continue
 
             # 진행 상황 보고
             processed_count += 1
             await ctx.report_progress(processed_count, disclosure_count) 
             
-            ctx.info(f"공시 {processed_count}/{disclosure_count} 분석 중: {report_name} (접수번호: {rcept_no})")
+            process_msg = f"공시 {processed_count}/{disclosure_count} 분석 중: {report_name} (접수번호: {rcept_no})"
+            ctx.info(process_msg)
+            result_log.append(f"INFO: {process_msg}")
             
             # XBRL 데이터 조회
             try:
-                xbrl_text = await get_financial_statement_xbrl(rcept_no, reprt_code)
+                # XBRL 데이터 조회 타임아웃 설정
+                start_time = time.time()
+                try:
+                    xbrl_task = asyncio.create_task(get_financial_statement_xbrl(rcept_no, reprt_code))
+                    done, pending = await asyncio.wait([xbrl_task], timeout=5.0)
+                    
+                    if xbrl_task in pending:
+                        # 5초 초과 시 현재까지의 로그와 수집된 결과 반환
+                        pending.pop().cancel()
+                        timeout_msg = f"XBRL 데이터 조회 시간 초과 (5초 이상 소요): {report_name}"
+                        ctx.error(timeout_msg)
+                        result_log.append(f"ERROR: {timeout_msg}")
+                        
+                        if result:
+                            result_log.append("\n--- 현재까지 수집된 결과 ---\n")
+                            result_log.append(result)
+                        
+                        return "\n".join(result_log)
+                    
+                    xbrl_text = xbrl_task.result()
+                except Exception as e:
+                    error_msg = f"XBRL 데이터 조회 중 오류 발생 ({report_name}): {str(e)}"
+                    ctx.error(error_msg)
+                    result_log.append(f"ERROR: {error_msg}")
+                    api_errors.append(f"{report_name}: {str(e)}")
+                    continue
+                
+                elapsed_time = time.time() - start_time
+                result_log.append(f"INFO: XBRL 데이터 조회 완료: {report_name} ({elapsed_time:.2f}초 소요)")
                 
                 # XBRL 파싱 및 데이터 추출
                 financial_data = {}
@@ -872,15 +970,24 @@ async def search_disclosure(
                 
                 if not xbrl_text.startswith(("DART API 오류:", "API 요청 실패:", "ZIP 파일", "<인코딩 오류:")):
                      try:
+                         start_time = time.time()
                          financial_data = parse_xbrl_financial_data(xbrl_text, items_to_extract)
+                         elapsed_time = time.time() - start_time
+                         result_log.append(f"INFO: XBRL 파싱 완료: {report_name} ({elapsed_time:.2f}초 소요)")
                      except Exception as e:
                          parse_error = e
-                         ctx.warning(f"XBRL 파싱/분석 중 오류 발생 ({report_name}): {e}")
+                         error_msg = f"XBRL 파싱/분석 중 오류 발생 ({report_name}): {e}"
+                         ctx.warning(error_msg)
+                         result_log.append(f"WARNING: {error_msg}")
                          financial_data = {key: "분석 중 예외 발생" for key in items_to_extract}
                 elif xbrl_text.startswith("DART API 오류: 013"):
+                    api_error_msg = f"DART API 오류 (013): {report_name}"
+                    result_log.append(f"WARNING: {api_error_msg}")
                     financial_data = {key: "데이터 없음(API 013)" for key in items_to_extract}
                 else:
                     error_summary = xbrl_text.split('\n')[0][:100]
+                    error_msg = f"XBRL 데이터 오류 ({report_name}): {error_summary}"
+                    result_log.append(f"WARNING: {error_msg}")
                     financial_data = {key: f"오류({error_summary})" for key in items_to_extract}
                     api_errors.append(f"{report_name}: {error_summary}")
 
@@ -910,10 +1017,15 @@ async def search_disclosure(
                          result += "- 주요 재무 정보를 추출하지 못했습니다.\n"
                     
                     result += "\n" + "-" * 50 + "\n\n"
+                    result_log.append(f"INFO: 관련 데이터 추가됨: {report_name}")
                 else:
-                     ctx.info(f"[{report_name}] 건너뜀: 요청하신 항목({', '.join(requested_items) if requested_items else '전체'}) 관련 유효 데이터 없음.")
+                     skip_msg = f"[{report_name}] 건너뜀: 요청하신 항목({', '.join(requested_items) if requested_items else '전체'}) 관련 유효 데이터 없음."
+                     ctx.info(skip_msg)
+                     result_log.append(f"INFO: {skip_msg}")
             except Exception as e:
-                ctx.error(f"공시 처리 중 예상치 못한 오류 발생 ({report_name}): {e}")
+                error_msg = f"공시 처리 중 예상치 못한 오류 발생 ({report_name}): {e}"
+                ctx.error(error_msg)
+                result_log.append(f"ERROR: {error_msg}")
                 api_errors.append(f"{report_name}: {str(e)}")
                 traceback.print_exc()
 
@@ -936,10 +1048,16 @@ async def search_disclosure(
         if relevant_reports_found > 0 and requested_items:
              result += f"\n※ 요청하신 항목({', '.join(requested_items)}) 관련 정보가 있는 {relevant_reports_found}개의 보고서를 표시했습니다.\n"
 
+        result_log.append("INFO: 모든 공시 처리 완료")
+
     except Exception as e:
-        return f"재무 정보 검색 중 예상치 못한 오류가 발생했습니다: {str(e)}\n\n{traceback.format_exc()}"
+        error_msg = f"재무 정보 검색 중 예상치 못한 오류가 발생했습니다: {str(e)}\n\n{traceback.format_exc()}"
+        result_log.append(f"ERROR: {error_msg}")
+        return "\n".join(result_log)
 
     result += chat_guideline
+    result_log.append("\n--- 최종 결과 ---\n")
+    result_log.append(result.strip())
     return result.strip()
 
 
