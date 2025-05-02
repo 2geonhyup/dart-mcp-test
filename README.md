@@ -1,5 +1,7 @@
 # DART-MCP: 재무 분석을 위한 Claude 확장 프로그램
 
+[![smithery badge](https://smithery.ai/badge/@2geonhyup/dart-mcp-test)](https://smithery.ai/server/@2geonhyup/dart-mcp-test)
+
 DART API를 활용한 재무 분석 MCP(Model-assisted Capability Package)입니다. Claude를 이용하여 상장 기업의 재무 데이터를 쉽게 분석하고 시각화할 수 있습니다.
 
 상단에 더 상세하고 쉬운 가이드는 [https://dart-mcp.vercel.app/](https://dart-mcp.vercel.app/) 에서 보는 걸 추가드립니다.
@@ -53,6 +55,14 @@ DART API를 활용한 재무 분석 MCP(Model-assisted Capability Package)입니
 2. 계정 가입 및 로그인
 
 ## 설치 방법
+
+### Installing via Smithery
+
+To install dart-mcp-test for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@2geonhyup/dart-mcp-test):
+
+```bash
+npx -y @smithery/cli install @2geonhyup/dart-mcp-test --client claude
+```
 
 ### 1. GitHub에서 프로젝트 다운로드
 GitHub 페이지에서 zip 파일을 다운로드합니다.
