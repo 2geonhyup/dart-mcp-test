@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/2geonhyup-dart-mcp-test-badge.png)](https://mseep.ai/app/2geonhyup-dart-mcp-test)
+
 # DART-MCP: 재무 분석을 위한 Claude 확장 프로그램
 
 DART API를 활용한 재무 분석 MCP(Model-assisted Capability Package)입니다. Claude를 이용하여 상장 기업의 재무 데이터를 쉽게 분석하고 시각화할 수 있습니다.
